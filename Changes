@@ -1,0 +1,10 @@
+Revision history for Perl extension WWW::ShopBot::Driver.
+
+0.001  Sun Mar  9 22:45:14 2003
+	- original version; created by h2xs 1.21 with options
+	- COM::froogle    xern
+	- TW::answer168   xern
+	- TW::pdaking     xern
+	- TW::mren        xern
+
+

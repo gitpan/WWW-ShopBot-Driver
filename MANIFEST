@@ -1,0 +1,12 @@
+AUTHORS
+Changes
+Driver.pm
+MANIFEST
+Makefile.PL
+README
+WWW/ShopBot/COM/froogle.pm
+WWW/ShopBot/TW/answer168.pm
+WWW/ShopBot/TW/mren.pm
+WWW/ShopBot/TW/pdaking.pm
+test.pl
+bin/shopbot.pl
