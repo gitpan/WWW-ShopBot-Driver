@@ -1,5 +1,5 @@
 package WWW::ShopBot::Driver;
-our $VERSION = '0.005';
+our $VERSION = '0.006';
 use Carp qw(confess);
 use Data::Dumper;
 use strict;

@@ -28,3 +28,9 @@ Revision history for Perl extension WWW::ShopBot::Driver.
 	  analyze() added
 	- TW::kingstone   xern
 	- TW::bookzone    xern
+
+0.006  Sun, 16 Mar 2003 18:54:43 +0800
+	- shopbot.pl      0.06
+	  pattern() added
+	- TW::4book       xern
+	- TW::olbook      xern

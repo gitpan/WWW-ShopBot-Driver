@@ -9,7 +9,8 @@ our $VERSION = '0.03';
 sub query {
     my $pkg = shift;
     my ($content, $item, @result, %next, %links);
-    my $agent = WWW::Mechanize->new(proxy=> $pkg->{proxy}, cookie_jar => $pkg->{jar});
+    my $agent = WWW::Mechanize->new(proxy=> $pkg->{proxy}, cookie_jar => $pkg->{jar},
+				    );
     $agent->get('http://www.tenlong.com.tw/');
     $agent->forms(0);
     $agent->field('oldbook_keyword:nb', $pkg->{product});

@@ -8,6 +8,7 @@ WriteMakefile(
 	'WWW::ShopBot'   => '0.05',
 	'HTML::TableContentParser' => '0.13',
 	'HTML::Parser'   => '3.27',
+	'Cwd'            => '2.06',
     }, 
     'EXE_FILES'          => [ <bin/*.pl> ],
     ($] >= 5.005 ?    

@@ -1,7 +1,6 @@
 #!/usr/local/bin/perl
-eval 'exec /usr/bin/perl  -S $0 ${1+"$@"}' if 0;
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 use WWW::ShopBot qw(list_drivers list_drivers_paths);
 use Data::Dumper;
@@ -261,6 +260,46 @@ sub analyze {
     print $mecha->content;
 }
 
+# ----------------------------------------------------------------------
+use Cwd 'abs_path';
+sub pattern {
+    my $text;
+    die "$0 pattern (URL | FILE) query)\n" unless $_[0];
+    if ( -f abs_path($_[0]) ){
+	open F, abs_path($_[0]) or die "$!\n";
+	local $/;
+	$text = <F>;
+	close F;
+    }
+    else {
+	my $mecha = WWW::Mechanize->new();
+	$mecha->get($_[0]);
+	$text = $mecha->content;
+    }
+    die "No content\n" unless $text;
+    my $query = $_[1] || die "You query?\n";
+    my @lines = split /\n/, $text;
+    my $cnt = 1;
+    my $pos = 0;
+
+    foreach (map {join $/, @lines[$_..$_+5]} 0..$#lines){
+	$pos = 0 if $pos >=5;
+	$pos++ if /$query/;
+	if( $pos == 3 && /$query/){
+	    s/\?/\\?/go;
+	    s/([\+\(\)\?\.])/\\$1/go;
+	    if(s/$query/(.+?)/){
+		s/([\$\^\*\[\]\{\}\\\|])/\\$1/go;
+		s/\n+/\\n+/go;
+		s/\s{1}/ /go;
+		s/\s{2,}/\\s+/go;
+		print "[$cnt]",$/, $_,$/x3;
+		$cnt++;
+	    }
+	}
+    }
+}
+
 
 # ======================================================================
 my %cmdtbl =
@@ -270,6 +309,7 @@ my %cmdtbl =
      newdriver => \&newdriver,
      driver => \&driver,
      analyze => \&analyze,
+     pattern => \&pattern,
      action => \&action,
      version => \&version,
      help => \&help,
@@ -300,6 +340,8 @@ shopbot.pl - Shopping Agent
  % shopbot.pl driver      COM::Shhhhhh
 
  % shopbot.pl analyze     URL
+
+ % shopbot.pl pattern     URL     query
 
  % shopbot.pl action      query   COM::Shhhhhh
 
@@ -350,6 +392,12 @@ It fetches the content of the given URL and dumps related information parsed fro
  % shopbot.pl analyze http://shhhhhhh.com/
 
 It dumps result to STDOUT.
+
+=head2 Generate recognition patterns
+
+ % shopbot.pl pattern (URL | FILE) query
+
+Shopbot.pl provides a rudimental function which can generate a pattern according to your query, and then you can cut'n'paste the thing to your driver and modify it. This may save some time.
 
 =head2 ACTION!
 
