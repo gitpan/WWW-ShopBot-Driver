@@ -9,6 +9,8 @@ doc/SITES
 lib/WWW/ShopBot/COM/froogle.pm
 lib/WWW/ShopBot/Driver.pm
 lib/WWW/ShopBot/TW/answer168.pm
+lib/WWW/ShopBot/TW/bookzone.pm
+lib/WWW/ShopBot/TW/kingstone.pm
 lib/WWW/ShopBot/TW/lailai.pm
 lib/WWW/ShopBot/TW/mren.pm
 lib/WWW/ShopBot/TW/pchome.pm

@@ -4,10 +4,10 @@ use WWW::Mechanize;
 use Data::Dumper;
 use WWW::ShopBot::Driver;
 our @ISA = qw(WWW::ShopBot::Driver);
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 
-our $base = 'http://www.answer168.com/';
+our $base = 'http://www.answer168.com';
 sub query {
     my $pkg = shift;
     my ($content, $item, @result, %next, %links);
@@ -20,23 +20,27 @@ sub query {
 
     my $content = $agent->content;
     if($content =~ m,href="(product.+?=all)",o){
-	$agent->get($base."goods/$1");
+	$agent->get($base."/goods/$1");
 	$content = $agent->content;
     }
     $pkg->linkextor(\$content, \%links, qr'layout=0&class_no.+?goods'o);
+
+    my $specpatt = {
+	product => qr'<td><b><span class="text18">(.+?)</span></b>'o,
+	price => qr'價：<b><font color="#.+?">\$(.+)</font></b>元<br>'o,
+	photo => qr'/(image/mall_image/.+?\.jpg)'o,
+    };
 
     foreach (keys %links){
 	$item = {};
 	$agent->get($base.$_);
 	$content = $agent->content;
-	$pkg->specextor(\$content, $item,
-			{
-			    product => qr'<td><b><span class="text18">(.+?)</span></b>'o,
-			    price => qr'價：<b><font color="#.+?">\$(.+)</font></b>元<br>'o,
-			    photo => qr'/(image/mall_image/.+?\.jpg)'o,
-			});
-	$item->{price} =~ s/,//o;
-	push @result, $item;
+	if($pkg->specextor(\$content, $item, $specpatt)){
+	    $item->{link} = $base.$_;
+	    $item->{photo} = $base.'/'.$item->{photo};
+	    $item->{price} =~ s/,//o;
+	    push @result, $item;
+	}
     }
     \@result;
 }
@@ -49,3 +53,6 @@ __END__
 
 0.02 xern
     Thu, 13 Mar 2003 19:40:15 +0800
+
+0.03 xern
+    Sat, 15 Mar 2003 12:57:14 +0800

@@ -1,26 +1,28 @@
 #!/usr/local/bin/perl
 eval 'exec /usr/bin/perl  -S $0 ${1+"$@"}' if 0;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 use WWW::ShopBot qw(list_drivers list_drivers_paths);
 use Data::Dumper;
+use WWW::Mechanize;
 
-sub version {
-    print "$0 version: $VERSION$/";
-}
+# ----------------------------------------------------------------------
+sub version { print "$0 version: $VERSION$/" }
 
+# ----------------------------------------------------------------------
 sub list {
     @drivers = list_drivers;
     print map({"- $_\n"} @drivers), "\n", scalar(@drivers)." driver(s) found\n"; 
 }
 
+# ----------------------------------------------------------------------
 sub list_paths {
     @drivers = list_drivers_paths;
     print map({"- $_\n"} @drivers), "\n", scalar(@drivers)." driver(s) found\n";
 }
 
-
+# ----------------------------------------------------------------------
 sub driver {
     my $driver = shift or die "Driver's name?\n";
     my @hier = split /::/, $driver;
@@ -42,9 +44,11 @@ OUTPUT
     }
 }
 
+# ----------------------------------------------------------------------
 sub newdriver {
     my $dn = shift;
     my $dd = shift || '.';
+    die "Driver's name?\n" unless $dn;
     my @array = ($dd,, 'WWW', 'ShopBot', (split /::/, $dn));
     mkdir join q,/,, @array[0..$_] foreach (0..$#array-1);
     my $fullname = join q,/,, @array[0..$#array-1], $array[-1].'.pm';
@@ -64,9 +68,7 @@ use HTML::LinkExtractor;
 use HTML::Entities ();
 use LWP::Simple;
 
-
 sub linkextor {
-
     # defined for extracting links to detail pages
 
     # This subroutine is inherited from WWW::ShopBot::Driver
@@ -75,23 +77,26 @@ sub linkextor {
     # You can delete this part if you just want to inherit from 
     # the parent
 
-    my($textref, $collector, $pattern) = @_;
+    my $pkg = shift;
+    my $textref = shift;
+    my $collector = shift;
+    my $pattern = $pkg->transformarg(@_);
     return unless $$textref;
+
     my $LX = new HTML::LinkExtractor();
     $LX->parse($textref);
 
     my $cnt = 0;
     foreach (@{$LX->links()}){
-        if($_->{href} =~ /$pattern/){
-            $collector->{$_->{href}} = 1;
-            $cnt++;
-        }
+	if($pkg->match(\${$_}{href}, $pattern)){
+	    $collector->{$_->{href}} = 1;
+	    $cnt++;
+	}
     }
     $cnt;
 }
 
 sub nextextor {
-
     # defined for extracting links to next pages
 
     # This subroutine is inherited from WWW::ShopBot::Driver
@@ -100,20 +105,26 @@ sub nextextor {
     # You can delete this part if you just want to inherit from 
     # the parent
 
-    my($textref, $collector, $pattern) = @_;
+    my $pkg = shift;
+    my $textref = shift;
+    my $collector = shift;
+    my $pattern = $pkg->transformarg(@_);
     return unless $$textref;
+
     my $LX = new HTML::LinkExtractor();
     $LX->parse($textref);
 
     my $cnt = 0;
     foreach (@{$LX->links()}){
-        if($_->{href} =~ /$pattern/){
-            $collector->{$_->{href}} = 1;
-            $cnt++;
-        }
+	if($pkg->match(\${$_}{href}, $pattern)){
+	    $collector->{$_->{href}} = 1;
+	    $cnt++;
+	}
     }
     $cnt;
 }
+
+
 
 sub specextor {
 
@@ -122,25 +133,28 @@ sub specextor {
     # This subroutine is inherited from WWW::ShopBot::Driver
     # and is the same as the one in parent class
 
-    # You can delete this part if you just want to inherit from
+    # You can delete this part if you just want to inherit from 
     # the parent
 
     my $pkg = shift;
     my ($textref, $collector, $pattern) = @_;
     return unless $$textref;
-    if($$textref =~ m/${$pattern}{product}/){
+    if($$textref =~ m/$pattern->{product}/){
         $collector->{product} = $1;
 
-        if($$textref =~ m/${$pattern}{price}/){
+        if($$textref =~ m/$pattern->{price}/){
             $collector->{price} = $1;
 
-            if($$textref =~ m/${$pattern}{photo}/){
+            if($$textref =~ m/$pattern->{photo}/){
                 $collector->{photo} = $1;
             }
         }
     }
+
     1 if defined $collector->{price} && defined $collector->{product};
 }
+
+
 
 sub query {
     my $pkg = shift;
@@ -152,34 +166,47 @@ sub query {
     $agent->click();
     $content = $agent->content;
 
-    my $linkpatt = qr'';
-    my $nextpatt = qr'';
+    my $link_accept    = qr''o;
+    my $next_accept    = qr''o;
+
+    my $link_discard   = qr''o;
+    my $next_discard   = qr''o;
 
     # extract links
-    $pkg->linkextor(\$content, \%links, $linkpatt);
+    $pkg->linkextor(\$content, \%links, $link_accept, $link_discard);
 
     # extract next pages
-    $pkg->nextextor(\$content, \%next, $nextpatt);
+    $pkg->nextextor(\$content, \%next, $next_accept, $next_discard);
 
     # .......
 
     foreach (keys %next){
+	$agent->get($_);
+	$content = $agent->content;
+	$pkg->linkextor(\$content, \%links, $link_accept, $link_discard);
+
 	# ......
     }
 
-    foreach (keys %links){
-	print $_.$/;
+    my $specpatt = {
+	product => qr''o,
+	price   => qr''o,
+	photo   => qr''o,
+    };
+
+    foreach my $link (keys %links){
+	print $link.$/;
 	$item = {};
-	$agent->get($_);
-	$pkg->specextor(\$content, $item, {
-	    product => qr'',
-	    price => qr'',
-	    photo => qr'',
-	});
+	$agent->get($link);
+	$content = $agent->content;
+        if($pkg->specextor(\$content, $item, $specpatt)){
+          $item->{link} = $link;
 
-        # ......
+	  # ......
 
-	push @result, $item;
+	  push @result, $item;
+        }
+
     }
 
     # return an anonymous array of hashes
@@ -190,14 +217,15 @@ TMPL
     print F "__END__\n\n";
 print F <<TMPL;
 
-0.01 a.u.thor <a.u.thor\@shhhhhh.com>
-    - template created using $0
+0.01 author <author\@shhhhhh.com>
+    - template created using shopbot.pl
          @{[ `date -R` ]}
 
 TMPL
     close F;
 }
 
+# ----------------------------------------------------------------------
 sub action {
     my $query = shift;
     list and exit unless @_;
@@ -205,21 +233,51 @@ sub action {
     print Dumper [ $bot->query($query) ];
 }
 
+# ----------------------------------------------------------------------
 sub help { system "perldoc $0 | less" }
 
+# ----------------------------------------------------------------------
+sub analyze {
+    my $url = shift or die "URL?\n";
+    my $mecha = WWW::Mechanize->new();
+    $mecha->get($url);
+    use Data::Dumper;
+    my $cnt = 1;
+    print "<Forms>\n";
+    foreach my $f (@{$mecha->forms}){
+	print    "Form(@{[$cnt++]}): ", $f->{attr}->{name}, $/;
+	foreach my $i (@{$f->{inputs}}){
+	    printf "  %-20s  %-15s\n", $i->{name}.'='.$i->{value}, $i->{type};
+	}
+    }
 
+    $cnt = 1;
+    print "\n<Links>\n";
+    foreach my $l (@{$mecha->links}){
+	print "[@{[$cnt++]}] ";
+	printf "%-15s  %s\n", $l->[1], $l->[0];
+    }
+    print "\n<Content>\n";
+    print $mecha->content;
+}
+
+
+# ======================================================================
 my %cmdtbl =
     (
      list => \&list,
      list_paths => \&list_paths,
      newdriver => \&newdriver,
      driver => \&driver,
+     analyze => \&analyze,
      action => \&action,
      version => \&version,
      help => \&help,
      );
 my $cmd = shift @ARGV;
 $cmdtbl{$cmd || 'help'}->(@ARGV);
+
+
 
 __END__
 
@@ -241,6 +299,8 @@ shopbot.pl - Shopping Agent
 
  % shopbot.pl driver      COM::Shhhhhh
 
+ % shopbot.pl analyze     URL
+
  % shopbot.pl action      query   COM::Shhhhhh
 
 =head1 DESCRIPTION
@@ -261,7 +321,7 @@ Or use
 
  % shopbot.pl list_paths
 
-It prints names of existent drivers with their paths.
+It lists full paths of existent drivers'
 
 =head2 Generate driver template
 
@@ -282,6 +342,14 @@ It creates a driver template WWW/ShopBot/COM/Shhhhhh.pm in your home's .shopbot_
 Example:
 
  % shopbot.pl driver COM::Shhhhhh
+
+=head2 Analyze a URL
+
+It fetches the content of the given URL and dumps related information parsed from it using WWW::Mechanize.
+
+ % shopbot.pl analyze http://shhhhhhh.com/
+
+It dumps result to STDOUT.
 
 =head2 ACTION!
 

@@ -1,24 +1,60 @@
 package WWW::ShopBot::Driver;
-our $VERSION = '0.004';
-
-
+our $VERSION = '0.005';
+use Carp qw(confess);
+use Data::Dumper;
+use strict;
 sub new { bless $_[1], $_[0] }
 sub query { [] }
 
 use HTML::LinkExtractor;
-use HTML::Entities ();
-use LWP::Simple;
+
+sub transformarg {
+    my $pkg = shift;
+    my $pattern = {};
+    if(@_ == 1 && ref($_[0]) =~ /^[HA]/o){
+        if(ref($_[0]) eq 'HASH')   {
+            $pattern = shift;
+        }
+        elsif(ref($_[0]) eq 'ARRAY'){
+            @{$pattern}{qw(accept discard refine)} = @{$_[0]};
+        }
+    }
+    else{
+	@{$pattern}{qw(accept discard refine)} = @_;
+    }
+    $pattern;
+}
+
+sub match {
+    my $pkg = shift;
+    my $textref = shift;
+    my $pattern = $pkg->transformarg(@_);
+    return if $pattern->{discard} && $$textref =~ /$pattern->{discard}/;
+    if($$textref =~ /$pattern->{accept}/){
+	if(ref($pattern->{refine}) eq 'CODE' ){
+	    $pattern->{refine}->($textref);
+	}
+	elsif(defined $pattern->{refine}){
+	    eval '$$textref =~ '.$pattern->{refine}.';';
+	    confess "Transformation error => $pattern->{refine}" if $@;
+	}
+	return 1;
+    }
+}
 
 sub linkextor {
     my $pkg = shift;
-    my($textref, $collector, $pattern) = @_;
+    my $textref = shift;
+    my $collector = shift;
+    my $pattern = $pkg->transformarg(@_);
     return unless $$textref;
+
     my $LX = new HTML::LinkExtractor();
     $LX->parse($textref);
 
     my $cnt = 0;
     foreach (@{$LX->links()}){
-	if($_->{href} =~ /$pattern/){
+	if($pkg->match(\${$_}{href}, $pattern)){
 	    $collector->{$_->{href}} = 1;
 	    $cnt++;
 	}
@@ -28,14 +64,17 @@ sub linkextor {
 
 sub nextextor {
     my $pkg = shift;
-    my($textref, $collector, $pattern) = @_;
+    my $textref = shift;
+    my $collector = shift;
+    my $pattern = $pkg->transformarg(@_);
     return unless $$textref;
+
     my $LX = new HTML::LinkExtractor();
     $LX->parse($textref);
 
     my $cnt = 0;
     foreach (@{$LX->links()}){
-	if($_->{href} =~ /$pattern/){
+	if($pkg->match(\${$_}{href}, $pattern)){
 	    $collector->{$_->{href}} = 1;
 	    $cnt++;
 	}
@@ -47,16 +86,23 @@ sub specextor {
     my $pkg = shift;
     my ($textref, $collector, $pattern) = @_;
     return unless $$textref;
-    if($$textref =~ m/${$pattern}{product}/){
-       $collector->{product} = $1;
-    
-       if($$textref =~ m/${$pattern}{price}/){
-	  $collector->{price} = $1;
+    if($$textref =~ m/$pattern->{product}/){
+	$collector->{product} = $1;
 
-	  if($$textref =~ m/${$pattern}{photo}/){
-	   $collector->{photo} = $1;
-          }
-       }
+	if($$textref =~ m/$pattern->{price}/){
+	    $collector->{price} = $1;
+
+	    if($$textref =~ m/$pattern->{photo}/){
+		$collector->{photo} = $1;
+	    }
+
+	    foreach my $entry (keys %{$pattern}){
+		next if /^p(?:roduct|rice|hoto)$/o;
+		if($$textref =~ m/$pattern->{$entry}/){
+		    $collector->{$entry} = $1;
+		}
+	    }
+	}
     }
     1 if defined $collector->{price} && defined $collector->{product};
 }
@@ -77,7 +123,7 @@ L<WWW::ShopBot::Driver>, which comes with multiple drivers for various merchants
 
 There are some things to be noted for driver development.
 
-=over 4
+=over 5
 
 =item *
 
@@ -101,25 +147,31 @@ Also because there are lots of EC sites, L<WWW::ShopBot::Driver> is isolated fro
 
 =item *
 
-Every driver inherits from L<WWW::ShopBot::Driver>, and every query request will pass to C<query> in every driver. So, please remember to let C<query> be the retrieving subroutine. Or more simply, you can use the accompanying C<shopbot.pl> to generate a driver template.
+Every driver inherits from L<WWW::ShopBot::Driver>, and every query request will pass to C<query> in every driver. So, please remember to let C<query> be the retrieving subroutine. Or more simply, you can use the accompanying L<shopbot.pl> to generate a driver template.
 
 You can use various modules to get data and extract them. Shopbot the module (does|can) not confine you to any fixed way. There are many modules for dealing with this; you can try them all.
 
-Driver.pm also defines three common method ready for inheritance: C<nextextor>, C<linkextor>, and C<specextor>, which you can use in C<query>.
+However, L<WWW::ShopBot::Driver> does presume a common convention, I think, which works with lots of sites. In general, following this convention may speed up your driver development.
+
+See L<shopbot.pl>
+
+=item *
+
+L<WWW::ShopBot::Driver> defines three common method ready for inheritance: C<nextextor>, C<linkextor>, and C<specextor>, which you can use in C<query>.
 
 =over 3
 
 =item * nextextor is defined for grabbing links to next pages
 
-  $pkg->nextextor(\$content, \%next, qr/pattern here/);
+  $pkg->nextextor(\$content, \%next, $next_accept, $next_discard);
 
-C<nextextor> use L<HTML::LinkExtractor> to extract links in a page. Any link matches the given pattern is stored in %next
+C<nextextor> uses L<HTML::LinkExtractor> to extract links in a page. Any link matches the given $next_accpet is stored in %next, but is discarded if it matches $next_discard
 
 =item * linkextor is defined for grabbing links to pages of products' details
 
-  $pkg->linkextor(\$content, \%next, qr/pattern here/);
+  $pkg->linkextor(\$content, \%next, $link_accept, $link_discard);
 
-Same as C<nextextor>, any link matches the given pattern is stored in %links
+Same as C<nextextor>, any link matches $link_accpet is stored in %links; discarded if it matches $link_discard
 
 =item * specextor is defined for analyzing pages of products' details
 
@@ -130,7 +182,7 @@ Same as C<nextextor>, any link matches the given pattern is stored in %links
 			photo => qr'<img src="(.+?)">',
 		    });
 
-It extracts the data that all match the given criteria and store them in $item.
+It extracts the data that all match the given criteria and stores them in $item.
 
 
 =back 

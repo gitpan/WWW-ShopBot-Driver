@@ -5,35 +5,9 @@ use Data::Dumper;
 use WWW::ShopBot::Driver;
 our @ISA = qw(WWW::ShopBot::Driver);
 
-our $VERSION = '0.02';
-
+our $VERSION = '0.03';
 use LWP::Simple;
 use HTML::LinkExtractor;
-
-sub nextextor {
-    shift;
-    my($textref, $collector, $pattern) = @_;
-    return unless $$textref;
-    while($$textref =~ m,(http://www.pdaking.com.tw/cgi-bin/shop/search.cgi\?cart_id=\d+&keywords=.+?&page=\d+),sgo){
-	$collector->{$1} = 1;
-    }
-
-}
-
-sub specextor {
-    my $pkg = shift;
-    my ($textref, $collector, $pattern) = @_;
-
-    if($$textref =~ /${$pattern}{product}/){
-       $collector->{product} = $1;
-       if($$textref =~ /${$pattern}{price}/){
-	  $collector->{price} = $1;
-	  if($$textref =~ /${$pattern}{photo}/){
-	   $collector->{photo} = $1;
-          }
-       }
-    }
-}
 
 
 our $firsturl = 'http://www.pdaking.com.tw/cgi-bin/shop/search.cgi?search';
@@ -44,28 +18,30 @@ sub query {
     my $ua = new LWP::UserAgent(proxy => $pkg->{proxy}, cookie_jar => $pkg->{jar});
     my $content = ($ua->post($firsturl, {keywords=> $pkg->{product}}))->{_content};
 
-    $pkg->nextextor(\$content, \%next);
+    my $linkpatt = qr,http://www.pdaking.com.tw/cgi-bin/shop/shop.cgi\?action=imgbi,;
+    my $nextpatt = qr'search.cgi\?cart_id=\d+&keywords=.+?&page=\d+'o;
+
+    $pkg->nextextor(\$content, \%next, $nextpatt);
 
     foreach (keys %next){
 	my $content = get($_);
 	next unless $content;
-	$pkg->linkextor(\$content, \%links, qr,http://www.pdaking.com.tw/cgi-bin/shop/shop.cgi\?action=imgbi,);
+	$pkg->linkextor(\$content, \%links, );
     }
+
+    my $specpatt = {
+	product => qr,商品.+?color="#.+?">(.+?)</font>,m,
+	price   => qr,特價.+?color="#.+?">(\d+)元,m,
+	photo   => qr,<table width="100%" border="0" cellspacing="0" cellpadding="3">.+?<tr valign="top"><td align="center" WIDTH=50%>.+?<img src="(.+?)" border=0>.+?</td><td WIDTH=50%>,s,
+    };
 
     foreach (keys %links){
 	$item = {};
-	my $content = get $_;
-	next unless $content;
-	$pkg->specextor(
-			\$content,
-			$item,
-			{
-			    product => qr,商品.+?color="#.+?">(.+?)</font>,m,
-			    price   => qr,特價.+?color="#.+?">(\d+)元,m,
-			    photo   => qr,<table width="100%" border="0" cellspacing="0" cellpadding="3">.+?<tr valign="top"><td align="center" WIDTH=50%>.+?<img src="(.+?)" border=0>.+?</td><td WIDTH=50%>,s,
-			}
-			);
-	push @result, $item;
+	my $content = get($_);
+	if($pkg->specextor(\$content, $item, $specpatt)){
+	    $item->{link} = $_;
+	    push @result, $item;
+	}
     }
     return \@result;
 }
@@ -78,3 +54,6 @@ __END__
 
 0.02 xern
     Thu, 13 Mar 2003 18:53:27 +0800
+
+0.03 xern
+    Sat, 15 Mar 2003 13:50:02 +0800

@@ -22,3 +22,9 @@ Revision history for Perl extension WWW::ShopBot::Driver.
 0.004  Thu, 13 Mar 2003 21:19:19 +0800
 	- linkextor, nextextor, specextor added
 	- most drivers are modified with the new methods
+
+0.005  Sat, 15 Mar 2003 21:33:11 +0800
+	- shopbot.pl      0.05
+	  analyze() added
+	- TW::kingstone   xern
+	- TW::bookzone    xern

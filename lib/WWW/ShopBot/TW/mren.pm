@@ -4,25 +4,7 @@ use WWW::Mechanize;
 use Data::Dumper;
 use WWW::ShopBot::Driver;
 our @ISA = qw(WWW::ShopBot::Driver);
-our $VERSION = '0.02';
-
-sub specextor {
-    my $pkg = shift;
-    my ($textref, $collector, $pattern) = @_;
-    return unless $$textref;
-    if($$textref =~ m/${$pattern}{product}/){
-       $collector->{product} = $1;
-    
-       if($$textref =~ m/${$pattern}{price}/){
-	  $collector->{price} = $1;
-
-	  if($$textref =~ m/${$pattern}{photo}/){
-	   $collector->{photo} = $1;
-          }
-       }
-    }
-    1 if defined $collector->{price} && defined $collector->{product};
-}
+our $VERSION = '0.03';
 
 sub query {
     my $pkg = shift;
@@ -37,28 +19,26 @@ sub query {
 
     $pkg->linkextor(\$content, \%links, qr'show\.php3\?id=.+'o);
 
+    my $specpatt =  {
+	product => qr'<p align="center">&nbsp;<font color="#FFFFFF"><b>(.+?)</b></font></p>'o,
+	price => qr'<font color="white">建議價.+?face=".+?sans-serif">([\d\.]+?)</font>'so,
+	photo => qr/"javascript:window\.open\('showimage\.php3\?(pid=\d+)',/o
+             };
+
     foreach (map{"http://www.mren.com.tw/product/$_"} keys %links){
 	$item = {};
 	$agent->get($_);
 	$content = $agent->content;
 
-	$pkg->specextor
-	    (
-	     \$content, $item,
-	     {
-		 product => qr'<p align="center">&nbsp;<font color="#FFFFFF"><b>(.+?)</b></font></p>'o,
-		 price => qr'<font color="white">建議價.+?face=".+?sans-serif">([\d\.]+?)</font>'so,
-		 photo => qr/"javascript:window\.open\('showimage\.php3\?(pid=\d+)',/o
-             }
-            );
-
-        $agent->get("http://www.mren.com.tw/product/showns.php3?".$item->{photo});
-        $content = $agent->content;
-        if( $content =~ /img src=(.+?) width/o){
-            $item->{photo} = "http://www.mren.com.tw/product/$1";
+	if($pkg->specextor(\$content, $item, $specpatt)){
+          $item->{link} = $_;
+          $agent->get("http://www.mren.com.tw/product/showns.php3?".$item->{photo});
+          $content = $agent->content;
+          if( $content =~ /img src=(.+?) width/o){
+              $item->{photo} = "http://www.mren.com.tw/product/$1";
+          }
+	  push @result, $item;
         }
-
-	push @result, $item;
     }
 
     \@result;
@@ -74,3 +54,5 @@ __END__
 0.02 xern
     Thu, 13 Mar 2003 20:06:22 +0800
 
+0.03 xern
+    Sat, 15 Mar 2003 13:34:27 +0800

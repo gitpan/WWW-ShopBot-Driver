@@ -4,7 +4,7 @@ use WWW::Mechanize;
 use Data::Dumper;
 use WWW::ShopBot::Driver;
 our @ISA = qw(WWW::ShopBot::Driver);
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 sub query {
     my $pkg = shift;
@@ -29,18 +29,21 @@ sub query {
 	$pkg->linkextor(\$content, \%links, $linkpatt);
     }
 
+    my $specpatt =  {
+	product => qr'<td class="pageHeading">(.+?)</td>'o,
+	price => qr'價格 :</font> NT\$(.+?)</td>'o,
+	photo => qr'href="(http://www.lailai.com.tw/tchinese/images/.+?)\?osCsid=.+?"'o,
+    };
+
     foreach (keys %links){
 	$item = {};
 	$agent->get($_);
 	$content = $agent->content;
 
-	$pkg->specextor(\$content, $item,
-			{
-			    product => qr'<td class="pageHeading">(.+?)</td>'o,
-			    price => qr'價格 :</font> NT\$(.+?)</td>'o,
-			    photo => qr'href="(http://www.lailai.com.tw/tchinese/images/.+?)\?osCsid=.+?"'o,
-			});
-	push @result, $item;
+	if($pkg->specextor(\$content, $item, $specpatt)){
+	    $item->{link} = $_;
+	    push @result, $item;
+	}
     }
 
     # return an anonymous array of hashes
@@ -55,3 +58,6 @@ __END__
 
 0.02 xern
     - Thu, 13 Mar 2003 20:01:40 +0800
+
+0.03 xern
+    - Sat, 15 Mar 2003 13:32:11 +0800
