@@ -18,3 +18,7 @@ Revision history for Perl extension WWW::ShopBot::Driver.
 	- TW::pchome      xern
 	- TW::silkbook    xern
 	- TW::tenlong     xern
+
+0.004  Thu, 13 Mar 2003 21:19:19 +0800
+	- linkextor, nextextor, specextor added
+	- most drivers are modified with the new methods

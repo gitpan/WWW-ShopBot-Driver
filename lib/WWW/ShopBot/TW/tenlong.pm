@@ -4,23 +4,7 @@ use WWW::Mechanize;
 use Data::Dumper;
 use WWW::ShopBot::Driver;
 our @ISA = qw(WWW::ShopBot::Driver);
-our $VERSION = '0.01';
-
-use HTML::Entities ();
-
-sub linkextor {
-    my($textref, $collector) = @_;
-    while($$textref =~ m,<td><a href="(view_oldbook_html\?oldbook_isbn=.+?)",g){
-        $collector->{"http://www.tenlong.com.tw/catalog/".$1} = 1;
-    }
-}
-
-sub nextextor {
-    my($textref, $collector) = @_;
-    while($$textref =~ /pattern here/g){
-        $collector->{$1} = 1;
-    }
-}
+our $VERSION = '0.02';
 
 sub query {
     my $pkg = shift;
@@ -32,32 +16,28 @@ sub query {
     $agent->click();
     $content = $agent->content;
 
-    # extract links
-    linkextor(\$content, \%links);
+    my $linkpatt = qr'view_oldbook_html\?oldbook_isbn=.+?';
 
+    $pkg->linkextor(\$content, \%links, $linkpatt);
     while(1){
 	unless($content =~ m,</table>[\t\s\n]+?<a href="(http://www.tenlong.com.tw/catalog/oldbook_keyword_html\?.+?&query_start=\d+)".+?\Q(後 \E\d+\Q 筆結果)\E,s){
-	    linkextor(\$content, \%links);
+	    $pkg->linkextor(\$content, \%links, $linkpatt);
 	    last;
 	}
 	$agent->get($1);
 	$content = $agent->content;
-	linkextor(\$content, \%links);
+	$pkg->linkextor(\$content, \%links, $linkpatt);
     };
 
-    foreach (keys %links){
-        undef $item;
+    foreach (map{"http://www.tenlong.com.tw/catalog/$_"} keys %links){
+	$item = {};
 	$agent->get($_);
 	$content = $agent->content;
-	if($content =~ m,<h2><font color="green">[\s\t\n]+(.+?)[\s\t\n]+</font></h2>,s){
-	    $item->{product} = $1;
-	    if($content =~ /\Q定價： 新台幣 \E(\d+)\Q 元正<br>\E/){
-		$item->{price} = $1;
-		if($content =~ m,<img src="(http://www.tenlong.com.tw/catalog/cover/.+?)" alt,){
-		    $item->{photo} = $1;
-		}
-	    }
-	}
+        $pkg->specextor(\$content, $item, {
+            product => qr'<h2><font color="green">[\s\t\n]+(.+?)[\s\t\n]+</font></h2>'o,
+            price => qr'新台幣 (\d+) 元正<br>',
+            photo => qr'<img src="(http://www.tenlong.com.tw/catalog/cover/.+?)"'o,
+        });
 	push @result, $item;
     }
 
@@ -73,3 +53,5 @@ __END__
          Wed, 12 Mar 2003 18:20:35 +0800
 
 
+0.02 xern
+    - Thu, 13 Mar 2003 20:53:14 +0800

@@ -1,13 +1,17 @@
 package WWW::ShopBot::TW::answer168;
 use strict;
 use WWW::Mechanize;
+use Data::Dumper;
 use WWW::ShopBot::Driver;
 our @ISA = qw(WWW::ShopBot::Driver);
-our $VERSION = '0.01';
-our $base = 'http://www.answer168.com/';
+our $VERSION = '0.02';
 
+
+our $base = 'http://www.answer168.com/';
 sub query {
     my $pkg = shift;
+    my ($content, $item, @result, %next, %links);
+
     my $agent = WWW::Mechanize->new(proxy=> $pkg->{proxy}, cookie_jar => $pkg->{jar});
     $agent->get($base);
     $agent->form_name('searchprdt');
@@ -19,23 +23,19 @@ sub query {
 	$agent->get($base."goods/$1");
 	$content = $agent->content;
     }
-    my(@result, %detail, $item);
-    while($content =~ m,href="(/detail.asp\?layout=0&class_no=0&action=tempo&goods_no=.+?)",sgo){
-	$detail{$1} = 1;
-    }
-    foreach (keys %detail){
-	undef $item;
+    $pkg->linkextor(\$content, \%links, qr'layout=0&class_no.+?goods'o);
+
+    foreach (keys %links){
+	$item = {};
 	$agent->get($base.$_);
 	$content = $agent->content;
-	if($content =~ m,<td><b><span class="text18">(.+?)</span></b>,){
-	    $item->{product} = $1;
-	}
-	if($content =~ m,價：<b><font color="#.+?">\$(.+)</font></b>元<br>,){
-  	  $item->{price} = $1;
-        }
-	if($content =~ m,/(image/mall_image/.+?\.jpg),){
-	    $item->{photo} = $base.$1;
-	}
+	$pkg->specextor(\$content, $item,
+			{
+			    product => qr'<td><b><span class="text18">(.+?)</span></b>'o,
+			    price => qr'價：<b><font color="#.+?">\$(.+)</font></b>元<br>'o,
+			    photo => qr'/(image/mall_image/.+?\.jpg)'o,
+			});
+	$item->{price} =~ s/,//o;
 	push @result, $item;
     }
     \@result;
@@ -46,3 +46,6 @@ __END__
 
 0.01 xern <xern@cpan.org>
     Tue, 11 Mar 2003 18:39:39 +0800
+
+0.02 xern
+    Thu, 13 Mar 2003 19:40:15 +0800

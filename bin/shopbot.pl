@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl
 eval 'exec /usr/bin/perl  -S $0 ${1+"$@"}' if 0;
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 use WWW::ShopBot qw(list_drivers list_drivers_paths);
 use Data::Dumper;
@@ -18,6 +18,28 @@ sub list {
 sub list_paths {
     @drivers = list_drivers_paths;
     print map({"- $_\n"} @drivers), "\n", scalar(@drivers)." driver(s) found\n";
+}
+
+
+sub driver {
+    my $driver = shift or die "Driver's name?\n";
+    my @hier = split /::/, $driver;
+    foreach (sort @INC){
+	my $drpath = $_.'/WWW/ShopBot/'.join('/', @hier).'.pm';
+	if(-f $drpath){
+	    local $/;
+	    open F, $drpath or die "Cannot open driver $drpath\n";
+	    my $content = <F>;
+	    $content =~ /\$VERSION.+=[\t\s\n]*(.+?)[\s\t\n]*;/;
+	    print <<OUTPUT;
+- driver  => $driver
+  path    => $drpath
+  version => $1
+
+OUTPUT
+	    close F;
+	}
+    }
 }
 
 sub newdriver {
@@ -37,37 +59,107 @@ use WWW::ShopBot::Driver;
 our @ISA = qw(WWW::ShopBot::Driver);
 our $VERSION = '0.01';
 
+# delete the following modules if you do not need them
+use HTML::LinkExtractor;
 use HTML::Entities ();
+use LWP::Simple;
+
 
 sub linkextor {
-    my($textref, $collector) = @_;
-    while($$textref =~ /pattern here/g){
-        $collector->{$1} = 1;
+
+    # defined for extracting links to detail pages
+
+    # This subroutine is inherited from WWW::ShopBot::Driver
+    # and is the same as the one in parent class
+
+    # You can delete this part if you just want to inherit from 
+    # the parent
+
+    my($textref, $collector, $pattern) = @_;
+    return unless $$textref;
+    my $LX = new HTML::LinkExtractor();
+    $LX->parse($textref);
+
+    my $cnt = 0;
+    foreach (@{$LX->links()}){
+        if($_->{href} =~ /$pattern/){
+            $collector->{$_->{href}} = 1;
+            $cnt++;
+        }
     }
+    $cnt;
 }
 
 sub nextextor {
-    my($textref, $collector) = @_;
-    while($$textref =~ /pattern here/g){
-        $collector->{$1} = 1;
+
+    # defined for extracting links to next pages
+
+    # This subroutine is inherited from WWW::ShopBot::Driver
+    # and is the same as the one in parent class
+
+    # You can delete this part if you just want to inherit from 
+    # the parent
+
+    my($textref, $collector, $pattern) = @_;
+    return unless $$textref;
+    my $LX = new HTML::LinkExtractor();
+    $LX->parse($textref);
+
+    my $cnt = 0;
+    foreach (@{$LX->links()}){
+        if($_->{href} =~ /$pattern/){
+            $collector->{$_->{href}} = 1;
+            $cnt++;
+        }
     }
+    $cnt;
+}
+
+sub specextor {
+
+    # defined for extracting detailed information of products
+
+    # This subroutine is inherited from WWW::ShopBot::Driver
+    # and is the same as the one in parent class
+
+    # You can delete this part if you just want to inherit from
+    # the parent
+
+    my $pkg = shift;
+    my ($textref, $collector, $pattern) = @_;
+    return unless $$textref;
+    if($$textref =~ m/${$pattern}{product}/){
+        $collector->{product} = $1;
+
+        if($$textref =~ m/${$pattern}{price}/){
+            $collector->{price} = $1;
+
+            if($$textref =~ m/${$pattern}{photo}/){
+                $collector->{photo} = $1;
+            }
+        }
+    }
+    1 if defined $collector->{price} && defined $collector->{product};
 }
 
 sub query {
     my $pkg = shift;
     my ($content, $item, @result, %next, %links);
     my $agent = WWW::Mechanize->new(proxy=> $pkg->{proxy}, cookie_jar => $pkg->{jar});
-    $agent->get('http://shhhhhh/');
+    $agent->get('FIRST_URL');
     $agent->form_name('shhhhh');
     $agent->field('shhhhhh', $pkg->{product});
     $agent->click();
     $content = $agent->content;
 
+    my $linkpatt = qr'';
+    my $nextpatt = qr'';
+
     # extract links
-    linkextor(\$content, \%links);
+    $pkg->linkextor(\$content, \%links, $linkpatt);
 
     # extract next pages
-    nextextor(\$content, \%next);
+    $pkg->nextextor(\$content, \%next, $nextpatt);
 
     # .......
 
@@ -77,7 +169,13 @@ sub query {
 
     foreach (keys %links){
 	print $_.$/;
-        undef $item;
+	$item = {};
+	$agent->get($_);
+	$pkg->specextor(\$content, $item, {
+	    product => qr'',
+	    price => qr'',
+	    photo => qr'',
+	});
 
         # ......
 
@@ -115,6 +213,7 @@ my %cmdtbl =
      list => \&list,
      list_paths => \&list_paths,
      newdriver => \&newdriver,
+     driver => \&driver,
      action => \&action,
      version => \&version,
      help => \&help,
@@ -136,19 +235,21 @@ shopbot.pl - Shopping Agent
 
  % shopbot.pl list
 
- % shopbot.pl list_path
+ % shopbot.pl list_paths
 
- % shopbot.pl newdriver COM::Shhhhhh
+ % shopbot.pl newdriver   COM::Shhhhhh
 
- % shopbot.pl action query drivers
+ % shopbot.pl driver      COM::Shhhhhh
+
+ % shopbot.pl action      query   COM::Shhhhhh
 
 =head1 DESCRIPTION
 
-It is a script for you to list existent shopbot drivers, generate driver's template, or go grab price info.
+It is a script for you to list existent shopbot drivers, generate driver's template, or go grab price info, etc.
 
 =head1 USAGE
 
-=head2 Print version number
+=head2 Print version of shopbot.pl
 
  % shopbot.pl version
 
@@ -173,6 +274,14 @@ Example,
  % shopbot.pl newdriver COM::Shhhhhh ~/.shopbot_drivers/
 
 It creates a driver template WWW/ShopBot/COM/Shhhhhh.pm in your home's .shopbot_drivers
+
+=head2 List driver's information
+
+ % shopbot.pl driver driver_name
+
+Example:
+
+ % shopbot.pl driver COM::Shhhhhh
 
 =head2 ACTION!
 

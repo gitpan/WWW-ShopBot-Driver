@@ -7,6 +7,7 @@ ok(1);
 unshift @INC, "./lib";
 
 @drivers = qw();
+print "@drivers\n";
 $bot = new WWW::ShopBot(
 			drivers => \@drivers,
 			);

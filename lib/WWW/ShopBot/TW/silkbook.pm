@@ -4,25 +4,9 @@ use WWW::Mechanize;
 use Data::Dumper;
 use WWW::ShopBot::Driver;
 our @ISA = qw(WWW::ShopBot::Driver);
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use HTML::Entities ();
-
-sub linkextor {
-    my($textref, $collector) = @_;
-    while($$textref =~ m,HREF="(http://www.silkbook.com.tw/content/4th.asp\?goods_ser=.+?)",go){
-        $collector->{$1} = 1;
-    }
-}
-
-
-sub nextextor {
-    my($textref, $collector) = @_;
-    while($$textref =~ /HREF="(Search_List_Book.asp\?Sort_flag=8&.+?)"/go){
-	next if $1 =~ /page=1&/o;
-        $collector->{HTML::Entities::decode("http://www.silkbook.com.tw/function/$1")} = 1;
-    }
-}
 
 sub query {
     my $pkg = shift;
@@ -34,32 +18,35 @@ sub query {
     $agent->click();
     $content = $agent->content;
 
+    my $linkpatt = qr'http://www.silkbook.com.tw/content/4th.asp\?goods_ser=.+?';
+    my $nextpatt = qr'Search_List_Book.asp\?Sort_flag=8&.+?';
+
     # extract links
-    linkextor(\$content, \%links);
+    $pkg->linkextor(\$content, \%links, $linkpatt);
 
     # extract next pages
-    nextextor(\$content, \%next);
+    $pkg->nextextor(\$content, \%next, $nextpatt);
 
-    foreach (keys %next){
+    foreach (
+	     map{HTML::Entities::decode("http://www.silkbook.com.tw/function/$_")}
+	       grep {$_!~/page=1&/o} keys %next){
 	$agent->get($_);
 	$content = $agent->content;
-	linkextor(\$content, \%links);
+	$pkg->linkextor(\$content, \%links, $linkpatt);
     }
 
     foreach (keys %links){
-	undef $item;
+	$item = {};
 	$agent->get($_);
 	$content = $agent->content;
-	if($content =~ m,<font COLOR="#BD0000">● </font><font COLOR="#0000A0">\s*(.+?)\s*</font>,){
-	    $item->{product} = $1;
-	    $item->{product} =~ s/--$//;
-	    if($content =~ m,售價：<FONT FACE="Arial" COLOR="#BD0000">(.+?)</FONT>元<BR>,){
-		$item->{price} = $1;
-		if($content =~ m,<img src="(.+?)" ALT=,){
-		    $item->{photo} = "http://www.silkbook.com.tw".$1;
-		}
-	    }
-	}
+	$pkg->specextor(\$content, $item,
+			{
+			    product => qr'<font COLOR="#BD0000">● </font><font COLOR="#0000A0">\s*(.+?)\s*</font>'o,
+			    price => qr'售價：<FONT FACE="Arial" COLOR="#BD0000">(.+?)</FONT>元<BR>'o,
+			    photo => qr'<img src="(.+?)" ALT='o,
+			});
+	$item->{product} =~ s/--$//o;
+	$item->{photo} = "http://www.silkbook.com.tw".$item->{photo};
 	push @result, $item;
     }
 
@@ -73,4 +60,6 @@ __END__
     - template created using bin/shopbot.pl
          Wed, 12 Mar 2003 14:41:19 +0800
 
+0.02 xern
+    - Thu, 13 Mar 2003 20:34:35 +0800
 

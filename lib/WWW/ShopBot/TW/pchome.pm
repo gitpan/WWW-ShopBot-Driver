@@ -4,14 +4,8 @@ use WWW::Mechanize;
 use Data::Dumper;
 use WWW::ShopBot::Driver;
 our @ISA = qw(WWW::ShopBot::Driver);
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
-sub linkextor {
-    my($textref, $collector) = @_;
-    while($$textref =~ m,<a href="(.+?/detail.php\?pid=.+?)",go){
-	$collector->{'http://shopping.pchome.com.tw'.$1} = 1;
-    }
-}
 
 sub query {
     my $pkg = shift;
@@ -23,29 +17,29 @@ sub query {
     $agent->click();
     $content = $agent->content;
 
-    linkextor(\$content, \%links);
+    my $linkpatt = qr'.+?/detail.php\?pid=.+?'o;
+
+    $pkg->linkextor(\$content, \%links, $linkpatt);
 
     $content =~ m,>(\d+)</font>&nbsp;筆</td>,;
+
     foreach my $p ( 2..int ($1/20)+1 ){
 	$agent->get('http://shopping.pchome.com.tw/search.htm?target='.$pkg->{product}."&kind=index&page=$p");
 	$content = $agent->content;
-	linkextor(\$content, \%links);
+	$pkg->linkextor(\$content, \%links,);
     }
-
-    foreach (keys %links){
-        undef $item;
-
+    
+    foreach ( map{"http://shopping.pchome.com.tw$_"} keys %links ){
+	$item = {};
 	$agent->get($_);
 	$content = $agent->content;
-	if($content =~ m,<!--- 品名 --->.+?<span class=item2>(.+?)</span>,s){
-	    $item->{product} = $1;
-	    if($content =~ m,特價</b>&nbsp;&nbsp;<b><font face=".+?" color=c90026>\$(.+?)</font></b>,m){
-		$item->{price} = $1;
-		if($content =~ m,<img src="(.+?)" width=120 height=120 border=0 alt="點圖看大圖">,){
-		    $item->{photo} = "http://shopping.pchome.com.tw$1";
-		}
-	    }
-	}
+	$pkg->specextor(\$content, $item,
+			{
+			    product => qr'<!--- 品名 --->.+?<span class=item2>(.+?)</span>'s,
+			    price => qr'特價</b>&nbsp;&nbsp;<b><font face=".+?" color=c90026>\$(.+?)</font></b>'m,
+			    photo => qr'<img src="(.+?)" width=120 height=120 border=0 alt="點圖看大圖">'m,
+			    });
+	$item->{photo} = "http://shopping.pchome.com.tw".$item->{photo};
 	push @result, $item;
     }
 
@@ -58,4 +52,6 @@ __END__
 0.01 xern <xern@cpan.org>
     - Wed, 12 Mar 2003 13:12:23 +0800
 
+0.02 xern
+    - Thu, 13 Mar 2003 20:26:41 +0800
 

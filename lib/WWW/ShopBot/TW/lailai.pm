@@ -4,24 +4,7 @@ use WWW::Mechanize;
 use Data::Dumper;
 use WWW::ShopBot::Driver;
 our @ISA = qw(WWW::ShopBot::Driver);
-our $VERSION = '0.01';
-
-sub linkextor {
-    my($textref, $collector) = @_;
-
-    while($$textref =~ m,href="(http://www.lailai.com.tw/tchinese/product_info.php\?products_id=.+?)",mgo){
-	$collector->{$1} = 1;
-    }
-    
-}
-
-sub nextextor {
-    my($textref, $collector) = @_;
-    while($$textref =~ m,href="(http://www.lailai.com.tw/tchinese/advanced_search_result.php\?keywords=.+?page=.+?)",sgo){
-        next if $1 =~ /action=/o;
-        $collector->{$1} = 1;
-    }
-}
+our $VERSION = '0.02';
 
 sub query {
     my $pkg = shift;
@@ -33,27 +16,30 @@ sub query {
     $agent->click();
 
     $content = $agent->content;
-    linkextor(\$content, \%links);
-    nextextor(\$content, \%next);
 
-    foreach (keys %next){
+    my $linkpatt = qr'http://www.lailai.com.tw/tchinese/product_info.php\?products_id=.+?'o;
+    my $nextpatt = qr'http://www.lailai.com.tw/tchinese/advanced_search_result.php\?keywords=.+?page=.+?';
+
+    $pkg->linkextor(\$content, \%links, $linkpatt);
+    $pkg->nextextor(\$content, \%next, $nextpatt);
+
+    foreach (grep { $_ !~ /action=/o } keys %next){
 	$agent->get($_);
 	$content = $agent->content;
-	linkextor(\$content, \%links);
+	$pkg->linkextor(\$content, \%links, $linkpatt);
     }
+
     foreach (keys %links){
-        undef $item;
+	$item = {};
 	$agent->get($_);
 	$content = $agent->content;
-	if( $content =~ m,<td class="pageHeading">(.+?)</td>,o){
-	    $item->{product} = $1;
-	    if($content =~ m,價格 :</font> NT\$(.+?)</td>,o){
-		$item->{price} = $1;
-		if($content =~ m,href="(http://www.lailai.com.tw/tchinese/images/.+?)\?osCsid=.+?",o){
-		    $item->{photo} = $1;
-		}
-	    }
-	}
+
+	$pkg->specextor(\$content, $item,
+			{
+			    product => qr'<td class="pageHeading">(.+?)</td>'o,
+			    price => qr'價格 :</font> NT\$(.+?)</td>'o,
+			    photo => qr'href="(http://www.lailai.com.tw/tchinese/images/.+?)\?osCsid=.+?"'o,
+			});
 	push @result, $item;
     }
 
@@ -67,4 +53,5 @@ __END__
 0.01 xern <xern@cpan.org>
     - Wed, 12 Mar 2003 13:45:49 +0800
 
-
+0.02 xern
+    - Thu, 13 Mar 2003 20:01:40 +0800
