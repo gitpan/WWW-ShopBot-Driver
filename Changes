@@ -11,3 +11,10 @@ Revision history for Perl extension WWW::ShopBot::Driver.
 0.002  Wed, 12 Mar 2003 01:57:04 +0800
 	- list_paths added in shopbot.pl
 	- directory structure changed
+
+0.003  Wed, 12 Mar 2003 19:19:13 +0800
+	- shopbot.pl      0.03
+	- TW::lailai      xern
+	- TW::pchome      xern
+	- TW::silkbook    xern
+	- TW::tenlong     xern

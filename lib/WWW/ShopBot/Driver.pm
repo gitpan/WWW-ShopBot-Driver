@@ -1,5 +1,5 @@
 package WWW::ShopBot::Driver;1;
-our $VERSION = '0.002';
+our $VERSION = '0.003';
 sub new { bless $_[1], $_[0] }
 sub query { [] }
 
@@ -14,13 +14,9 @@ WWW::ShopBot::Driver - Basic class for shopbot drivers
 
 =head1 DESCRIPTION
 
-L<WWW::ShopBot> is trying to become a powerful shopping agent. You can use it to grab any product's information all over the world with an easy script.
+L<WWW::ShopBot::Driver>, which comes with multiple drivers for various merchants' sites, is a co-module released for L<WWW::ShopBot>. When you need to grab information on certain sites, invoke L<WWW::ShopBot> with drivers and the bot will automatically retrieve data. The number of drivers keeps increasing.
 
-And that's what drivers do.
-
-L<WWW::ShopBot::Driver> comes with multiple drivers for various merchants' sites. When you need to grab information on certain sites, invoke drivers and the bot will automatically retrieve data.
-
-There are some things to be noted.
+There are some things to be noted for writing.
 
 =over 4
 
@@ -55,6 +51,12 @@ You can use various modules to get data and extract them. Shopbot the module (do
 If you want to use a driver which is not distributed with the module, please be sure that your driver, say C<TW::Buzz.pm>, dwells in ${one of you @INC path}/WWW/ShopBot/TW/Buzz.pm
 
 =back
+
+=head1 CAVEAT
+
+The drivers are far from perfection; you should edit the code for any specific or advanced use.
+
+I<Of course, contributions are always welcomed.>
 
 =head1 SEE ALSO
 

@@ -1,10 +1,14 @@
 #!/usr/local/bin/perl
 eval 'exec /usr/bin/perl  -S $0 ${1+"$@"}' if 0;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use WWW::ShopBot qw(list_drivers list_drivers_paths);
 use Data::Dumper;
+
+sub version {
+    print "$0 version: $VERSION$/";
+}
 
 sub list {
     @drivers = list_drivers;
@@ -33,20 +37,46 @@ use WWW::ShopBot::Driver;
 our @ISA = qw(WWW::ShopBot::Driver);
 our $VERSION = '0.01';
 
+use HTML::Entities ();
+
+sub linkextor {
+    my($textref, $collector) = @_;
+    while($$textref =~ /pattern here/g){
+        $collector->{$1} = 1;
+    }
+}
+
+sub nextextor {
+    my($textref, $collector) = @_;
+    while($$textref =~ /pattern here/g){
+        $collector->{$1} = 1;
+    }
+}
+
 sub query {
     my $pkg = shift;
-    my ($content, $item, @result, @contents);
+    my ($content, $item, @result, %next, %links);
     my $agent = WWW::Mechanize->new(proxy=> $pkg->{proxy}, cookie_jar => $pkg->{jar});
     $agent->get('http://shhhhhh/');
     $agent->form_name('shhhhh');
     $agent->field('shhhhhh', $pkg->{product});
     $agent->click();
+    $content = $agent->content;
 
+    # extract links
+    linkextor(\$content, \%links);
+
+    # extract next pages
+    nextextor(\$content, \%next);
 
     # .......
 
+    foreach (keys %next){
+	# ......
+    }
 
-    foreach (@contents){
+    foreach (keys %links){
+	print $_.$/;
         undef $item;
 
         # ......
@@ -63,7 +93,8 @@ TMPL
 print F <<TMPL;
 
 0.01 a.u.thor <a.u.thor\@shhhhhh.com>
-    - @{[`date -R`]}
+    - template created using $0
+         @{[ `date -R` ]}
 
 TMPL
     close F;
@@ -71,7 +102,7 @@ TMPL
 
 sub action {
     my $query = shift;
-    list unless @_;
+    list and exit unless @_;
     my $bot = new WWW::ShopBot(drivers => \@_);
     print Dumper [ $bot->query($query) ];
 }
@@ -85,6 +116,7 @@ my %cmdtbl =
      list_paths => \&list_paths,
      newdriver => \&newdriver,
      action => \&action,
+     version => \&version,
      help => \&help,
      );
 my $cmd = shift @ARGV;
@@ -100,19 +132,25 @@ shopbot.pl - Shopping Agent
 
 =head1 SYNOPSIS
 
+ % shopbot.pl version
+
  % shopbot.pl list
 
  % shopbot.pl list_path
 
  % shopbot.pl newdriver COM::Shhhhhh
 
- % shopbot.pl query drivers
+ % shopbot.pl action query drivers
 
 =head1 DESCRIPTION
 
 It is a script for you to list existent shopbot drivers, generate driver's template, or go grab price info.
 
 =head1 USAGE
+
+=head2 Print version number
+
+ % shopbot.pl version
 
 =head2 List drivers in your library paths
 
