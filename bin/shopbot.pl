@@ -1,14 +1,19 @@
 #!/usr/local/bin/perl
 eval 'exec /usr/bin/perl  -S $0 ${1+"$@"}' if 0;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
-use WWW::ShopBot qw(list_drivers);
+use WWW::ShopBot qw(list_drivers list_drivers_paths);
 use Data::Dumper;
 
 sub list {
     @drivers = list_drivers;
     print map({"- $_\n"} @drivers), "\n", scalar(@drivers)." driver(s) found\n"; 
+}
+
+sub list_paths {
+    @drivers = list_drivers_paths;
+    print map({"- $_\n"} @drivers), "\n", scalar(@drivers)." driver(s) found\n";
 }
 
 sub newdriver {
@@ -77,6 +82,7 @@ sub help { system "perldoc $0 | less" }
 my %cmdtbl =
     (
      list => \&list,
+     list_paths => \&list_paths,
      newdriver => \&newdriver,
      action => \&action,
      help => \&help,
@@ -96,6 +102,8 @@ shopbot.pl - Shopping Agent
 
  % shopbot.pl list
 
+ % shopbot.pl list_path
+
  % shopbot.pl newdriver COM::Shhhhhh
 
  % shopbot.pl query drivers
@@ -109,6 +117,12 @@ It is a script for you to list existent shopbot drivers, generate driver's templ
 =head2 List drivers in your library paths
 
  % shopbot.pl list
+
+Or use
+
+ % shopbot.pl list_paths
+
+It prints names of existent drivers with their paths.
 
 =head2 Generate driver template
 

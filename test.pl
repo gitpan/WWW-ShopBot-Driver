@@ -1,6 +1,6 @@
 use Test;
 BEGIN { plan tests => 1 }
-use WWW::ShopBot;
+use WWW::ShopBot ;
 use Data::Dumper;
 ok(1);
 $bot = new WWW::ShopBot(
@@ -8,4 +8,4 @@ $bot = new WWW::ShopBot(
 				    ],
 			);
 
-print Dumper $bot->query('');
+Dumper $bot->query('');
